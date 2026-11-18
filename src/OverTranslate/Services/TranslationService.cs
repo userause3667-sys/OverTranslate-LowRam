@@ -11,6 +11,7 @@ using OverTranslate.Translation.Youdao;
 using OverTranslate.Layout;
 using OverTranslate.Models;
 using OverTranslate.Services.Providers;
+using OverTranslate.Services.Performance;
 
 namespace OverTranslate.Services;
 
@@ -242,10 +243,24 @@ public class TranslationService
     {
         var chosen   = engine ?? Saved;
         var provider = resilient ? Resilient(chosen) : Single(chosen);
-        var result   = await provider.TranslateAsync(blocks, sourceLang, targetLang, apiKey, cancellationToken, context);
-        LastEngineUsage = (provider as ResilientProvider)?.LastUsage;
-        return result;
+
+        // Low-RAM Edition: the game glossary and the persistent cache answer what they can, and only
+        // the rest reaches an engine — see TranslationAssist. With both switched off, or for a request
+        // that carries screen context, this is the original single call.
+        return await TranslationAssist.RunAsync(
+            blocks, sourceLang, targetLang, chosen, context,
+            async remaining =>
+            {
+                var result = await provider.TranslateAsync(
+                    remaining, sourceLang, targetLang, apiKey, cancellationToken, context);
+                LastEngineUsage = (provider as ResilientProvider)?.LastUsage;
+                return result;
+            },
+            engineUsed: used => { if (!used) LastEngineUsage = null; });
     }
+
+    /// <summary>Writes the translation cache to disk if it changed; called when the application exits.</summary>
+    public static void FlushCache() => TranslationAssist.Flush();
 
     /// <summary>
     /// Has <paramref name="engine"/> ready to answer before the first translation is asked of it:

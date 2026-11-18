@@ -83,6 +83,10 @@ public partial class App
         // happened to reach it first.
         AppIdentityService.Initialize();
 
+        // Low-RAM Edition: choose Ultra Low / Balanced / Quality from the setting and the installed RAM
+        // before any window or model exists, and write the choice to the log.
+        OverTranslate.Services.Performance.PerformanceManager.Initialize();
+
         ThemeService.Apply(SettingsService.Instance.Current.Theme);
 
         // Windows waits its mouse-hover time, 400ms, before a ToolTip comes up — long enough that
@@ -158,6 +162,7 @@ public partial class App
     protected override void OnExit(ExitEventArgs e)
     {
         _activateEvent?.Dispose();
+        TranslationService.FlushCache();
         base.OnExit(e);
     }
 }

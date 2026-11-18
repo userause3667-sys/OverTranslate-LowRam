@@ -93,6 +93,19 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Low-RAM Edition: performance panel -->
+                <Button x:Name="PerfBtn"
+                        Style="{StaticResource TrayMenuItem}"
+                        Click="PerfBtn_Click">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="14" Text="&#xE9D9;"
+                                   Width="22" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource AppTextSecondary}"/>
+                        <TextBlock Text="Hiệu năng / Performance" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
                 <!-- Separator -->
                 <Rectangle Height="1" Margin="8,3" Fill="{DynamicResource AppSeparator}"/>
 

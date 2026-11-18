@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><UseAppHost>false</UseAppHost><NoWarn>CS8632;CS0436;CA1416</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../OverTranslate/Models/PerformanceSettings.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/PerformanceProfile.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/PerformanceManager.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/PerfCounters.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/SystemMemory.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/TranslationCacheStore.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/GameGlossary.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/GameProfiles.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/GameProfileStore.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/TranslationAssist.cs" />
+  </ItemGroup>
+</Project>

@@ -36,7 +36,7 @@ namespace OverTranslate.Services.Realtime.Capture;
 /// which survives as the probe tool's way of answering it without a page.
 /// </remarks>
 [SupportedOSPlatform("windows10.0.18362.0")]
-public sealed class WgcWindowCaptureBackend : IRealtimeCaptureBackend
+public sealed class WgcWindowCaptureBackend : IRealtimeCaptureBackend, ISourceActivity
 {
     private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -946,6 +946,72 @@ public sealed class WgcWindowCaptureBackend : IRealtimeCaptureBackend
 
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    /// <inheritdoc />
+    public bool IsSourceActive
+    {
+        get
+        {
+            var hwnd = _hwnd;
+            return !IsDisposed && hwnd != IntPtr.Zero && IsWindow(hwnd) && IsWindowVisible(hwnd) && !IsIconic(hwnd);
+        }
+    }
+
+    /// <inheritdoc />
+    public bool IsSourceForeground
+    {
+        get
+        {
+            var hwnd = _hwnd;
+            var front = GetForegroundWindow();
+            if (front == IntPtr.Zero || front == hwnd) return true;
+
+            // A window of this application in front — the control bar, an overlay, the shell — is the
+            // user working with the session, not leaving the game.
+            return GetWindowThreadProcessId(front, out var processId) != 0
+                && processId == (uint)Environment.ProcessId;
+        }
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextW(IntPtr hwnd, System.Text.StringBuilder text, int maxCount);
+
+    /// <inheritdoc />
+    public string? SourceProcessName
+    {
+        get
+        {
+            try
+            {
+                var hwnd = _hwnd;
+                if (hwnd == IntPtr.Zero || GetWindowThreadProcessId(hwnd, out var processId) == 0) return null;
+                using var process = System.Diagnostics.Process.GetProcessById((int)processId);
+                return process.ProcessName;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public string? SourceWindowTitle
+    {
+        get
+        {
+            var hwnd = _hwnd;
+            if (hwnd == IntPtr.Zero) return null;
+            var text = new System.Text.StringBuilder(256);
+            return GetWindowTextW(hwnd, text, text.Capacity) > 0 ? text.ToString() : null;
+        }
+    }
 
     private const uint RDW_INVALIDATE = 0x0001;
     private const uint RDW_ALLCHILDREN = 0x0080;

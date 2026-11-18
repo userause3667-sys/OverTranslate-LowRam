@@ -134,6 +134,12 @@ public partial class TrayMenuWindow : Window
         Dismiss();
     }
 
+    private void PerfBtn_Click(object sender, RoutedEventArgs e)
+    {
+        Dismiss();
+        PerformanceMonitorWindow.Toggle();
+    }
+
     private void ExitBtn_Click(object sender, RoutedEventArgs e)
     {
         ExitRequested?.Invoke(this, EventArgs.Empty);

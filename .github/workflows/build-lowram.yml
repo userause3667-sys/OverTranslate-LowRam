@@ -1,0 +1,35 @@
+name: Build Low-RAM Portable
+
+# Chay tay: tab Actions -> "Build Low-RAM Portable" -> Run workflow.
+# Ket qua: 2 file ZIP (Installer + Portable) trong muc "Artifacts" o cuoi trang chay (giu 30 ngay). Khong can cai gi tren may ban.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Cai NSIS (de tao installer)
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+
+      - name: Build (test + publish + zip + installer)
+        shell: pwsh
+        run: ./build-lowram.ps1 -Installer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OverTranslate-LowRam-Installer-va-Portable
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          retention-days: 30

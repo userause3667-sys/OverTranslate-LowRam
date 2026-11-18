@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using NLog;
 using OverTranslate.Services.Ocr.Manga;
+using OverTranslate.Services.Performance;
 using RapidOcrNet;
 using SkiaSharp;
 
@@ -66,7 +67,11 @@ internal sealed class OnnxOcrEngine : IOcrEngine
     // MB with the larger ImgResize). This is a tray-resident, occasional-use tool, so we keep
     // only the active model loaded AND release it after a period of inactivity, returning that
     // memory to baseline while idle. The next capture transparently reloads the needed model.
-    private static readonly TimeSpan IdleReleaseDelay = TimeSpan.FromMinutes(1);
+    //
+    // Low-RAM Edition: the delay comes from the performance profile (Quality keeps the original
+    // minute; Ultra Low lets go after 20 seconds). Read at each use, so a changed profile applies
+    // from the next pass without a restart.
+    private static TimeSpan IdleReleaseDelay => Performance.PerformanceManager.Current.OcrIdleRelease;
 
     // Long enough that no real inference could still be running, short enough that a caller stuck
     // behind a wedged one gets an error instead of never returning.
@@ -292,6 +297,7 @@ internal sealed class OnnxOcrEngine : IOcrEngine
         // idle timer cannot dispose it between selection and Detect. The matching release
         // (which also re-arms the idle countdown) runs in the finally, under _sync.
         var runtime = AcquireRuntime(normalizedLanguage);
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         try
         {
             Log.Info(
@@ -354,6 +360,7 @@ internal sealed class OnnxOcrEngine : IOcrEngine
         }
         finally
         {
+            PerfCounters.RecordOcr((int)System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             ReleaseRuntime();
         }
     }
@@ -1010,6 +1017,7 @@ internal sealed class OnnxOcrEngine : IOcrEngine
 
     private void ReleaseIdleRuntime()
     {
+        var released = false;
         lock (_sync)
         {
             // Skip disposal if we are gone, a session is holding the model open, or a Detect is
@@ -1019,8 +1027,13 @@ internal sealed class OnnxOcrEngine : IOcrEngine
             if (_disposed || _keepWarm || _inUse > 0)
                 return;
 
+            if (_current is null) return;
             DisposeCurrentRuntime();
+            released = true;
         }
+
+        // Outside the lock: a compacting collection must not hold up a recognition asking for the model.
+        if (released) PerformanceManager.TrimAfterModelRelease();
     }
 
     // Callers hold _sync and have already established that nothing is running against the runtime.

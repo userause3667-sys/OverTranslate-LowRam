@@ -280,6 +280,9 @@ public class AppSettings
     /// <summary>What 即時翻譯 keeps between sittings, grouped.</summary>
     public RealtimeSettings Realtime { get; set; } = new();
 
+    /// <summary>Low-RAM Edition: memory profile, still-screen slow-down, translation cache and glossary.</summary>
+    public PerformanceSettings Performance { get; set; } = new();
+
     /// <summary>What the OCR debug overlay draws, grouped.</summary>
     public OcrDebugSettings OcrDebug { get; set; } = new();
 

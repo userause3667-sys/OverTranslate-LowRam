@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using NLog;
 using OverTranslate.Services.Ocr;
+using OverTranslate.Services.Performance;
 using OverTranslate.Services.Providers;
 using OverTranslate.Services.Realtime.Capture;
 
@@ -52,7 +53,9 @@ public sealed class RealtimeTranslationSession
     // Bounded so a long session on scrolling content cannot grow the cache without limit. Cleared
     // wholesale rather than evicted one by one: at this size the loss is one extra translation for
     // lines that are still on screen, and an LRU here would cost more to maintain than it saves.
-    private const int TranslationCacheLimit = 400;
+    // Low-RAM Edition: the limit is the profile's (400 on Quality and Balanced, as it always was; 300
+    // on Ultra Low), and what falls out of it is still in the persistent cache.
+    private static int TranslationCacheLimit => PerformanceManager.Current.SessionCacheLimit;
 
     // How many translations may be in flight across the whole session. More than one because a slow
     // answer must not delay the line after it, and only a few because a provider that has stopped
@@ -69,6 +72,9 @@ public sealed class RealtimeTranslationSession
     // Shared by every region, and generation-tagged so a provider answer from before a pause cannot
     // repopulate the cache after that pause cleared it.
     private readonly RealtimeTranslationCache _translationCache = new();
+
+    // Whether the window being watched is worth reading right now, shared by the region loops.
+    private readonly SourceInactivityTracker _sourceActivity = new();
 
     // What this session has translated, as a model is shown it, and the lines it is still waiting
     // on — both 「OpenAI 相容」 only; see TranslateAsync.
@@ -202,6 +208,10 @@ public sealed class RealtimeTranslationSession
         _sourceLanguage = sourceLanguage;
         _targetLanguage = targetLanguage;
         _capture = capture;
+
+        // Low-RAM Edition: the profile the user wrote for this game, if any — only a session on a single
+        // window can say which game it is. Set before the loops (and the recogniser) read the profile.
+        ApplyGameProfile(capture);
 
         var cts = new CancellationTokenSource();
         _cts = cts;
@@ -404,6 +414,7 @@ public sealed class RealtimeTranslationSession
     /// </param>
     public void Stop(bool releaseRecogniser = false)
     {
+        PerformanceManager.SetGameProfile(null);
         // The session is over, and what it translated is no guide to the next one, which may be
         // another game entirely. Kept on the way back to framing, as the cache is.
         if (releaseRecogniser) _history.Clear();
@@ -488,6 +499,8 @@ public sealed class RealtimeTranslationSession
             // have had their turn before the frame counts as answered: see the turn-away below.
             var gateTurnedAway = 0;
             var frameLoss = new RealtimeFrameLoss();
+            // Low-RAM Edition: waits a little longer between looks while this region has nothing to read.
+            var backoff = new ScanBackoff(PerformanceManager.Current);
 
             while (asked || await NextPollAsync(timer, step, token))
             {
@@ -502,6 +515,16 @@ public sealed class RealtimeTranslationSession
                 // retry has to be asked for. Applied here, where the state is only ever touched by
                 // this one loop.
                 if (pump.TakeRetryRequest()) state.Invalidate();
+
+                // Low-RAM Edition: a window that is minimised or gone is not read at all — no grab, no
+                // fingerprint — and once that has lasted the recognition model is let go. A demanded
+                // read (繼續, just pressed) is never held back.
+                if (!demanded && SourceIsResting(out var restFor))
+                {
+                    step.Set("source inactive");
+                    await Task.Delay(restFor, token);
+                    continue;
+                }
 
                 step.Set("grab");
                 using var frame = _capture?.GrabRegion(region.Bounds);
@@ -538,6 +561,7 @@ public sealed class RealtimeTranslationSession
                 if (reason == RealtimeReadReason.Nothing)
                 {
                     skippedPolls++;
+                    if (backoff.OnIdlePoll() is { Ticks: > 0 } extra) await Task.Delay(extra, token);
                     continue;
                 }
 
@@ -604,9 +628,13 @@ public sealed class RealtimeTranslationSession
                         // the 1 frame in 23 that neither size can see.
                         if (++gateTurnedAway >= 2) state.MarkScanned(Capture);
                         skippedPolls++;
+                        if (backoff.OnIdlePoll() is { Ticks: > 0 } extra) await Task.Delay(extra, token);
                         continue;
                     }
                 }
+
+                // Past the gate with something to read: the normal rhythm again.
+                backoff.OnActivity();
 
                 // Past the gate, so the next turn-away starts a fresh pair.
                 gateTurnedAway = 0;
@@ -686,6 +714,53 @@ public sealed class RealtimeTranslationSession
         {
             step.Set("ended");
         }
+    }
+
+    // Low-RAM Edition. Looks the watched window up in game-profiles.json and makes the match (or none)
+    // the active game profile.
+    private static void ApplyGameProfile(IRealtimeCaptureBackend capture)
+    {
+        GameProfile? match = null;
+        if (capture is ISourceActivity source)
+        {
+            var process = source.SourceProcessName;
+            if (process is not null) match = GameProfileStore.Find(process, source.SourceWindowTitle);
+            Log.Info("Realtime source process={Process} -> game profile {Profile}",
+                process ?? "(unknown)", match?.Name ?? "(none)");
+        }
+
+        PerformanceManager.SetGameProfile(match);
+    }
+
+    // Low-RAM Edition. True when the window this session watches should not be read right now, with
+    // how long the calling loop should rest before asking again. Only a session on a single window can
+    // tell (see ISourceActivity); a whole-screen session is never resting.
+    private bool SourceIsResting(out TimeSpan restFor)
+    {
+        restFor = TimeSpan.Zero;
+
+        var settings = PerformanceManager.EffectiveSettings;
+        if (!settings.PauseWhenSourceInactive || _capture is not ISourceActivity source) return false;
+
+        var profile = PerformanceManager.Current;
+        var active = source.IsSourceActive && (!settings.PauseWhenSourceNotForeground || source.IsSourceForeground);
+        var step = _sourceActivity.Evaluate(active, profile.InactiveReleaseAfter);
+
+        if (step.ReleaseModel)
+        {
+            Log.Info("Realtime source window inactive for {Seconds}s: releasing the recognition model",
+                (int)profile.InactiveReleaseAfter.TotalSeconds);
+            _ocr.ReleaseModel();
+        }
+
+        if (step.Resumed)
+        {
+            Log.Info("Realtime source window active again: keeping the recognition model warm");
+            _ocr.SetKeepWarm(true);
+        }
+
+        restFor = profile.InactivePollDelay;
+        return step.Skip;
     }
 
     // A look at the region that threw: logged, reported, and the picture held back — see

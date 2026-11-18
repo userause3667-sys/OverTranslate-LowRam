@@ -30,6 +30,14 @@
     <ApplicationIcon>icons\app.ico</ApplicationIcon>
     <StartupObject>OverTranslate.App</StartupObject>
     <Version>2.11.0</Version>
+    <!-- Low-RAM Edition. Written into OverTranslate.runtimeconfig.json and read by the runtime at startup.
+         Concurrent (background) GC keeps a second collector thread and extra bookkeeping per heap; this
+         application's heap is small and its pauses are not what a screen translator is judged on, so the
+         blocking collector is the cheaper trade. TieredPGO adds instrumentation to hot methods in tier 0
+         for a speed-up that takes longer to arrive than most sessions of a tray application last. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <TieredPGO>false</TieredPGO>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <!-- WFAC010 tells WinForms apps to declare DPI awareness through Application.SetHighDpiMode.
          This is a WPF app that only references WinForms types; ApplicationConfiguration.Initialize
@@ -117,4 +125,11 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" ExcludeAssets="all" />
     <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Low-RAM Edition: 0-9, higher compacts the old generations more eagerly to release fragmented
+         memory (documented .NET setting System.GC.ConserveMemory). 3 is a moderate value; 0 restores the default. -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="3" />
+  </ItemGroup>
+
 </Project>

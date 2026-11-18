@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The pure logic is compiled straight in: it has no WPF, settings or logging dependency. -->
+    <Compile Include="../OverTranslate/Models/PerformanceSettings.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/PerformanceProfile.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/ScanBackoff.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/SourceInactivityTracker.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/TranslationCacheStore.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/GameGlossary.cs" />
+    <Compile Include="../OverTranslate/Services/Performance/GameProfiles.cs" />
+  </ItemGroup>
+</Project>
