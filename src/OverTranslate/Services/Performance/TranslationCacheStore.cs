@@ -61,7 +61,7 @@ internal sealed class TranslationCacheStore
     private TimeSpan _ttl;
     private bool _loaded;
     private bool _dirty;
-    private Timer? _saveTimer;
+    private System.Threading.Timer? _saveTimer;
 
     public TranslationCacheStore(string path, int maxEntries, TimeSpan ttl, TimeProvider? clock = null)
     {
@@ -261,7 +261,7 @@ internal sealed class TranslationCacheStore
     private void MarkDirty()
     {
         _dirty = true;
-        _saveTimer ??= new Timer(_ => Flush(), null, SaveDelay, Timeout.InfiniteTimeSpan);
+        _saveTimer ??= new System.Threading.Timer(_ => Flush(), null, SaveDelay, Timeout.InfiniteTimeSpan);
     }
 
     // Caller holds _gate. Written beside the file and moved over it, so a crash mid-write leaves the

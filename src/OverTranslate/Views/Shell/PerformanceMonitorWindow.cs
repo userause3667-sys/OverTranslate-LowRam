@@ -6,6 +6,12 @@ using System.Windows.Threading;
 using OverTranslate.Services;
 using OverTranslate.Services.Performance;
 
+// The project also uses WinForms (tray icon), so these names are ambiguous without an alias.
+using Button = System.Windows.Controls.Button;
+using Color = System.Windows.Media.Color;
+using FontFamily = System.Windows.Media.FontFamily;
+using Orientation = System.Windows.Controls.Orientation;
+
 namespace OverTranslate.Views.Shell;
 
 /// <summary>
