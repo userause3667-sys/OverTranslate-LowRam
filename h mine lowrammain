@@ -1,0 +1,39 @@
+[1mdiff --git a/src/OverTranslate/Services/Performance/TranslationCacheStore.cs b/src/OverTranslate/Services/Performance/TranslationCacheStore.cs[m
+[1mindex 51238a38..8630299b 100644[m
+[1m--- a/src/OverTranslate/Services/Performance/TranslationCacheStore.cs[m
+[1m+++ b/src/OverTranslate/Services/Performance/TranslationCacheStore.cs[m
+[36m@@ -61,7 +61,7 @@[m [minternal sealed class TranslationCacheStore[m
+     private TimeSpan _ttl;[m
+     private bool _loaded;[m
+     private bool _dirty;[m
+[31m-    private Timer? _saveTimer;[m
+[32m+[m[32m    private System.Threading.Timer? _saveTimer;[m
+ [m
+     public TranslationCacheStore(string path, int maxEntries, TimeSpan ttl, TimeProvider? clock = null)[m
+     {[m
+[36m@@ -261,7 +261,7 @@[m [minternal sealed class TranslationCacheStore[m
+     private void MarkDirty()[m
+     {[m
+         _dirty = true;[m
+[31m-        _saveTimer ??= new Timer(_ => Flush(), null, SaveDelay, Timeout.InfiniteTimeSpan);[m
+[32m+[m[32m        _saveTimer ??= new System.Threading.Timer(_ => Flush(), null, SaveDelay, Timeout.InfiniteTimeSpan);[m
+     }[m
+ [m
+     // Caller holds _gate. Written beside the file and moved over it, so a crash mid-write leaves the[m
+[1mdiff --git a/src/OverTranslate/Views/Shell/PerformanceMonitorWindow.cs b/src/OverTranslate/Views/Shell/PerformanceMonitorWindow.cs[m
+[1mindex 9665eda5..a4c3c987 100644[m
+[1m--- a/src/OverTranslate/Views/Shell/PerformanceMonitorWindow.cs[m
+[1m+++ b/src/OverTranslate/Views/Shell/PerformanceMonitorWindow.cs[m
+[36m@@ -6,6 +6,12 @@[m [musing System.Windows.Threading;[m
+ using OverTranslate.Services;[m
+ using OverTranslate.Services.Performance;[m
+ [m
+[32m+[m[32m// The project also uses WinForms (tray icon), so these names are ambiguous without an alias.[m
+[32m+[m[32musing Button = System.Windows.Controls.Button;[m
+[32m+[m[32musing Color = System.Windows.Media.Color;[m
+[32m+[m[32musing FontFamily = System.Windows.Media.FontFamily;[m
+[32m+[m[32musing Orientation = System.Windows.Controls.Orientation;[m
+[32m+[m
+ namespace OverTranslate.Views.Shell;[m
+ [m
+ /// <summary>[m
